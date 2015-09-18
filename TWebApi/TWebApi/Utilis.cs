@@ -1,0 +1,186 @@
+﻿using System;
+using System.CodeDom;
+using System.Collections.Generic;
+using System.Collections.Specialized;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Web.Mvc;
+using Newtonsoft.Json;
+
+namespace customApiApp_3
+{
+    public static class Utilis
+    {
+        /// <summary>
+        /// Gets a all Type instances matching the specified class name with just non-namespace qualified class name.
+        /// </summary>
+        /// <param name="className">Name of the class sought.</param>
+        /// <param name="ancestorType">Has an ancestor with type.</param>
+        /// <returns>Types that have the class name specified. They may not be in the same namespace.</returns>
+        public static Type[] GetTypesByName(string className, Type ancestorType)
+        {
+            var returnVal = new List<Type>();
+
+            foreach (var a in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    var assemblyTypes = a.GetTypes();
+                    returnVal.AddRange(assemblyTypes.Where(t => ancestorType.IsAssignableFrom(t) && String.Equals(t.Name, className, StringComparison.CurrentCultureIgnoreCase)));
+                }
+                catch { }
+            }
+
+            return returnVal.ToArray();
+        }
+
+        /// <summary>
+        /// Gets a Type instances matching the specified class name with just non-namespace qualified class name.
+        /// </summary>
+        /// <param name="className">Name of the class sought.</param>
+        /// <returns>Type that have the class name specified. They may not be in the same namespace.</returns>
+        /// <exception cref="System.Exception">Thrown when more than one Type was found</exception>
+
+
+        public static Type GetTypeByNameAndAncestor(string className, Type ancestorType)
+        {
+            var types = GetTypesByName(className, ancestorType).ToArray();
+            if (types.Length > 1)
+                throw new Exception("More than one type found!");
+            return types.Length == 0 ? null : types[0];
+        }
+
+        public static Type GetTypeByNameAndAncestor<TAncestor>(string className)
+        {
+            var types = GetTypesByName(className, typeof (TAncestor)).ToArray();
+            if (types.Length > 1)
+                throw new Exception("More than one type found!");
+            return types.Length == 0 ? null : types.First();
+        }
+
+        public static Type GetTypeByNameAndAncestorWithCustomAttribute<TAncestor>(string className, Type attribute)
+        {
+            var types =
+                GetTypesByName(className, typeof (TAncestor))
+                    .Where(x => x.GetCustomAttributes().Any(attribute.IsInstanceOfType)).ToArray();
+            if (types.Length > 1)
+                throw new Exception("More than one type found!");
+            return types.Length == 0 ? null : types.First();
+        }
+
+        public static MethodInfo[] GetMethodsByName(this Type type, string methodName)
+        {
+            return
+                type.GetMethods()
+                    .Where(method => String.Equals(method.Name, methodName, StringComparison.CurrentCultureIgnoreCase))
+                    .ToArray();
+        }
+        public static Tuple<MethodInfo, object[]> GetFirstMethodWhichMatchParameters(this Type controllerType, string methodName,
+           HttpVerbs httpVerb, Dictionary<string ,string> urlParams , Dictionary<string, string> postParams, int minimumRequiredParametersCount=0)
+        { 
+            var methods =
+                controllerType.GetMethodsByName(methodName)
+                    .Where(
+                        method =>
+                            method.GetCustomAttributes()
+                                .Any(
+                                    attribute =>
+                                        attribute is IHttpVerbAttribute &&
+                                        ((IHttpVerbAttribute)attribute).HttpVerb == httpVerb))
+                    .ToArray();
+
+            foreach (var method in methods.Reverse())
+            {
+                if (method.GetParameters().Length < minimumRequiredParametersCount)
+                    continue;
+                switch (httpVerb)
+                {
+                    case HttpVerbs.Get:
+                        var matchedParamsValues = new List<object>();
+                        for (int i = 0; i < method.GetParameters().Length; i++)
+                        {
+                            ParameterInfo parameter = method.GetParameters()[i];
+                            string gotParam;
+                            if (urlParams.TryGetValue(parameter.Name, out gotParam))
+
+                            {
+                                if (parameter.ParameterType == typeof(int))
+                                {
+                                    int integerParamValue;
+                                    if (int.TryParse(matchedParamsValues[matchedParamsValues.Count - 1].ToString(),
+                                        out integerParamValue))
+                                    {
+                                        matchedParamsValues.Add(integerParamValue);
+                                    }
+
+                                }
+                                else
+                                {
+                                    matchedParamsValues.Add(gotParam);
+                                }
+                            }
+                            else if (urlParams.Count <= i)
+                                continue;
+                            else if (parameter.ParameterType == typeof(int))
+                            {
+                                //if (String.Equals(parameter.Name, urlParams.GetKey(i), StringComparison.CurrentCultureIgnoreCase))
+                                int paramValue;
+                                if (int.TryParse(urlParams.ValueAtIndex(i), out paramValue))
+                                {
+                                    matchedParamsValues.Add(paramValue);
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                            else if (parameter.ParameterType == typeof (string))
+                            {
+                                matchedParamsValues.Add(urlParams.ValueAtIndex(i));
+                            }
+                            else
+                            {
+                                throw new NotSupportedException(
+                                    "An allowing 'Get' method cannot have parameters type other than string and int");
+                            }
+                        }
+                        if (matchedParamsValues.Count == method.GetParameters().Length &&
+                            (urlParams.Count == 0 || matchedParamsValues.Count > 0))
+                        {
+                            return new Tuple<MethodInfo, object[]>(method, matchedParamsValues.ToArray());
+                        }
+                        break;
+                    case HttpVerbs.Post:
+                        if (method.GetParameters().Length != 1)
+                            throw new NotSupportedException(
+                                "There are allowed only Post methods with one parameter.");
+                        var parameterType = method.GetParameters().First().ParameterType;
+
+                        var parameterObject = JsonConvert.DeserializeObject(JsonConvert.SerializeObject(postParams),
+                            parameterType,
+                            new JsonSerializerSettings {Error = (sender, args) => { args.ErrorContext.Handled = true; }});
+
+                        return new Tuple<MethodInfo, object[]>(method, new[] {parameterObject});
+                }
+            }
+            return null;
+        }
+        public static string JsonSerializer(object obj)
+        {
+            return Newtonsoft.Json.JsonConvert.SerializeObject(obj);
+        }
+
+        public static T ParseEnum<T>(string value)
+        {
+            return (T) Enum.Parse(typeof (T), value, true);
+        }
+        public static IEnumerable<string> GetPossibleTypesFromStringList(IEnumerable<string> values)
+        {
+            int intVal;
+            return values.Select(value => int.TryParse(value, out intVal) ? "int" : "string");
+        }
+    }
+}
