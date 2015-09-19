@@ -9,6 +9,7 @@ using customApiApp_3.Responses;
 
 namespace customApiApp_3.Controllers
 {
+    [TypeAliases("Location")]
     class LocationsController : ITApiObjectController<Location>
     {
         private readonly DbSet<Location> _locations;
@@ -39,7 +40,7 @@ namespace customApiApp_3.Controllers
         public object New(Location location)
         {
             _locations.Add(location);
-            _tDbContext.SaveChangesAsync();
+            _tDbContext.SaveChanges();
             return new { Status = "new location added", location };
         }
         [AllowGet]

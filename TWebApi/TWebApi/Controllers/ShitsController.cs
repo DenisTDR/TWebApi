@@ -4,11 +4,13 @@ using System.Data.Entity;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Web;
 using customApiApp_3.Models;
 using customApiApp_3.Responses;
 
 namespace customApiApp_3.Controllers
 {
+    [TypeAliases("Shit")]
     public class ShitsController : ITApiObjectController<Shit>
     {
         private readonly DbSet<Shit> _shits;
@@ -39,7 +41,7 @@ namespace customApiApp_3.Controllers
         public object New(Shit shit)
         {
             _shits.Add(shit);
-            _tDbContext.SaveChangesAsync();
+            _tDbContext.SaveChanges();
             return new { Status = "new shit added", Shit = shit };
         }
         [AllowGet]
@@ -85,10 +87,16 @@ namespace customApiApp_3.Controllers
             }
             else
             {
-                _tDbContext.Set<Shit>().Remove(oldValue);
+                _shits.Remove(oldValue);
                 _tDbContext.SaveChanges();
                 return new {info = "shit deleted"};
             }
+        }
+
+        [AllowGet]
+        public object GetPWD()
+        {
+            return HttpRuntime.AppDomainAppPath;
         }
     }
 }

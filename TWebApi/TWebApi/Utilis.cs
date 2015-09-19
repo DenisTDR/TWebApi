@@ -8,12 +8,17 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Mvc;
+using customApiApp_3.Controllers;
+using log4net;
 using Newtonsoft.Json;
+using System.Runtime.Caching;
 
 namespace customApiApp_3
 {
     public static class Utilis
     {
+        private static ILog Logger = log4net.LogManager.GetLogger(typeof(Utilis));
+        private static MemoryCache _typeCache = new MemoryCache("typeCache");
         /// <summary>
         /// Gets a all Type instances matching the specified class name with just non-namespace qualified class name.
         /// </summary>
@@ -22,18 +27,33 @@ namespace customApiApp_3
         /// <returns>Types that have the class name specified. They may not be in the same namespace.</returns>
         public static Type[] GetTypesByName(string className, Type ancestorType)
         {
-            var returnVal = new List<Type>();
-
+            string cacheKey = className + "_" + ancestorType.FullName;
+            List<Type> returnVal;
+            if (_typeCache[cacheKey] != null)
+            {
+                return (Type[]) _typeCache[cacheKey];
+            }
+            returnVal = new List<Type>();
+            var asss = AppDomain.CurrentDomain.GetAssemblies();
             foreach (var a in AppDomain.CurrentDomain.GetAssemblies())
             {
                 try
                 {
                     var assemblyTypes = a.GetTypes();
-                    returnVal.AddRange(assemblyTypes.Where(t => ancestorType.IsAssignableFrom(t) && String.Equals(t.Name, className, StringComparison.CurrentCultureIgnoreCase)));
+                    returnVal.AddRange(
+                        assemblyTypes.Where(
+                            t =>
+                                ancestorType.IsAssignableFrom(t) &&
+                                (string.Equals(t.Name, className, StringComparison.CurrentCultureIgnoreCase)) ||
+                                t.GetCustomAttributes()
+                                    .Any(x => x is TypeAliases && ((TypeAliases) x).Contains(className))));
                 }
-                catch { }
+                catch
+                {
+                    Logger.Debug("Cant load types from assemblei: " + a.FullName);
+                }
             }
-
+            _typeCache.Add(cacheKey, returnVal.ToArray(), DateTimeOffset.Now.AddDays(2));
             return returnVal.ToArray();
         }
 
@@ -47,7 +67,7 @@ namespace customApiApp_3
 
         public static Type GetTypeByNameAndAncestor(string className, Type ancestorType)
         {
-            var types = GetTypesByName(className, ancestorType).ToArray();
+            var types = GetTypesByName(className, ancestorType);
             if (types.Length > 1)
                 throw new Exception("More than one type found!");
             return types.Length == 0 ? null : types[0];
@@ -55,7 +75,7 @@ namespace customApiApp_3
 
         public static Type GetTypeByNameAndAncestor<TAncestor>(string className)
         {
-            var types = GetTypesByName(className, typeof (TAncestor)).ToArray();
+            var types = GetTypesByName(className, typeof (TAncestor));
             if (types.Length > 1)
                 throw new Exception("More than one type found!");
             return types.Length == 0 ? null : types.First();

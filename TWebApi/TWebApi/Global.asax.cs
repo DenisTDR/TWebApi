@@ -16,6 +16,8 @@ namespace customApiApp_3
             FilterConfig.RegisterGlobalFilters(GlobalFilters.Filters);
             RouteConfig.RegisterRoutes(RouteTable.Routes);
             BundleConfig.RegisterBundles(BundleTable.Bundles);
+            log4net.Config.XmlConfigurator.Configure();
+            log4net.LogManager.GetLogger(typeof (MvcApplication)).Debug("website started");
         }
     }
 }
