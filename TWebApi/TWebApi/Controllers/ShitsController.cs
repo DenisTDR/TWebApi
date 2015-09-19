@@ -24,6 +24,7 @@ namespace customApiApp_3.Controllers
         {
             return _shits;
         }
+
         [AllowGet]
         public object Get(int id)
         {
@@ -34,6 +35,13 @@ namespace customApiApp_3.Controllers
             return result;
         }
 
+        [AllowPost]
+        public object New(Shit shit)
+        {
+            _shits.Add(shit);
+            _tDbContext.SaveChangesAsync();
+            return new { Status = "new shit added", Shit = shit };
+        }
         [AllowGet]
         public object Gets(string id)
         {
@@ -50,46 +58,37 @@ namespace customApiApp_3.Controllers
             return result;
         }
 
-        [AllowGet]
-        public object Fuck(string id)
-        {
-            return "fuck cu str=" + id;
-        }
 
         [AllowPost]
-        public object New(Shit shit)
+        public object Update(Shit shit)
         {
-            _shits.Add(shit);
-            _tDbContext.SaveChangesAsync();
-            return shit;
-        }
-        /*public ShitsController()
-        {
-            shits = new List<Shit>
+            if (_shits.Find(shit.Id) == null)
             {
-                new Shit
-                {
-                    Id = 22,
-                    Name = "nume1",
-                    Description = "desc3213"
-                },
-                new Shit
-                {
-                    Id = 51,
-                    Name = "numeleee",
-                    Description = "grrfds dsf sdgsdg"
-                },
-                new Shit
-                {
-                    Id = 76,
-                    Name = "bdgb dgdg sg",
-                    Description = "sfs dfh dfhd fdgwegdj ng hkrsdtgzbd vgv fgv555"
-                }
-            };
-        }*/
-        public string One(string iemu, string def = "dfdf")
+                return New(shit);
+            }
+            else
+            {
+                var oldValue = _tDbContext.Entry(_shits.Find(shit.Id));
+                oldValue.CurrentValues.SetValues(shit);
+                _tDbContext.SaveChanges();
+                return new {Status = "shit updated", shit = _shits.Find(shit.Id)};
+            }
+        }
+
+        [AllowDelete]
+        public object Delete(int id)
         {
-            return "test 666";
+            Shit oldValue;
+            if ((oldValue = _shits.Find(id)) == null)
+            {
+                return new NotFound("Shit with id=" + id + " was not found!");
+            }
+            else
+            {
+                _tDbContext.Set<Shit>().Remove(oldValue);
+                _tDbContext.SaveChanges();
+                return new {info = "shit deleted"};
+            }
         }
     }
 }

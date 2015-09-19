@@ -96,56 +96,13 @@ namespace customApiApp_3
             {
                 if (method.GetParameters().Length < minimumRequiredParametersCount)
                     continue;
+                var matchedParamsValues = new List<object>();
                 switch (httpVerb)
                 {
                     case HttpVerbs.Get:
-                        var matchedParamsValues = new List<object>();
-                        for (int i = 0; i < method.GetParameters().Length; i++)
+                        if (!TryMatchParameters(method, urlParams, httpVerb, matchedParamsValues))
                         {
-                            ParameterInfo parameter = method.GetParameters()[i];
-                            string gotParam;
-                            if (urlParams.TryGetValue(parameter.Name, out gotParam))
-
-                            {
-                                if (parameter.ParameterType == typeof(int))
-                                {
-                                    int integerParamValue;
-                                    if (int.TryParse(matchedParamsValues[matchedParamsValues.Count - 1].ToString(),
-                                        out integerParamValue))
-                                    {
-                                        matchedParamsValues.Add(integerParamValue);
-                                    }
-
-                                }
-                                else
-                                {
-                                    matchedParamsValues.Add(gotParam);
-                                }
-                            }
-                            else if (urlParams.Count <= i)
-                                continue;
-                            else if (parameter.ParameterType == typeof(int))
-                            {
-                                //if (String.Equals(parameter.Name, urlParams.GetKey(i), StringComparison.CurrentCultureIgnoreCase))
-                                int paramValue;
-                                if (int.TryParse(urlParams.ValueAtIndex(i), out paramValue))
-                                {
-                                    matchedParamsValues.Add(paramValue);
-                                }
-                                else
-                                {
-                                    break;
-                                }
-                            }
-                            else if (parameter.ParameterType == typeof (string))
-                            {
-                                matchedParamsValues.Add(urlParams.ValueAtIndex(i));
-                            }
-                            else
-                            {
-                                throw new NotSupportedException(
-                                    "An allowing 'Get' method cannot have parameters type other than string and int");
-                            }
+                            continue;
                         }
                         if (matchedParamsValues.Count == method.GetParameters().Length &&
                             (urlParams.Count == 0 || matchedParamsValues.Count > 0))
@@ -164,10 +121,78 @@ namespace customApiApp_3
                             new JsonSerializerSettings {Error = (sender, args) => { args.ErrorContext.Handled = true; }});
 
                         return new Tuple<MethodInfo, object[]>(method, new[] {parameterObject});
+                    case HttpVerbs.Delete:
+                        if (!TryMatchParameters(method, urlParams, httpVerb, matchedParamsValues))
+                        {
+                            continue;
+                        }
+                        if (matchedParamsValues.Count == method.GetParameters().Length &&
+                            (urlParams.Count == 0 || matchedParamsValues.Count > 0))
+                        {
+                            return new Tuple<MethodInfo, object[]>(method, matchedParamsValues.ToArray());
+                        }
+                        break;
                 }
             }
             return null;
         }
+
+        private static bool TryMatchParameters(MethodInfo method, Dictionary<string, string> urlParams,
+            HttpVerbs requestVerb, List<object> matchedParamsValues)
+        {
+            if (matchedParamsValues == null)
+                return false;
+            else
+                matchedParamsValues.Clear();
+
+            for (int i = 0; i < method.GetParameters().Length; i++)
+            {
+                ParameterInfo parameter = method.GetParameters()[i];
+                string gotParam;
+                if (urlParams.TryGetValue(parameter.Name, out gotParam))
+
+                {
+                    if (parameter.ParameterType == typeof (int))
+                    {
+                        int integerParamValue;
+                        if (int.TryParse(matchedParamsValues[matchedParamsValues.Count - 1].ToString(),
+                            out integerParamValue))
+                        {
+                            matchedParamsValues.Add(integerParamValue);
+                        }
+                    }
+                    else
+                    {
+                        matchedParamsValues.Add(gotParam);
+                    }
+                }
+                else if (urlParams.Count <= i)
+                    continue;
+                else if (parameter.ParameterType == typeof (int))
+                {
+                    int paramValue;
+                    if (int.TryParse(urlParams.ValueAtIndex(i), out paramValue))
+                    {
+                        matchedParamsValues.Add(paramValue);
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                else if (parameter.ParameterType == typeof (string))
+                {
+                    matchedParamsValues.Add(urlParams.ValueAtIndex(i));
+                }
+                else
+                {
+                    throw new NotSupportedException(
+                        "An allowing '" + requestVerb + "' method cannot have parameters type other than string and int");
+                }
+            }
+            return true;
+        }
+
         public static string JsonSerializer(object obj)
         {
             return Newtonsoft.Json.JsonConvert.SerializeObject(obj);

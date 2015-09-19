@@ -15,13 +15,13 @@ namespace customApiApp_3
 
             routes.MapRoute(
                 "get by index api",
-                "api/{st}({index})",
+                "{st}({index})",
                 new { controller = "MainApi", action = "GetByIndex" }
                 );
             // for apis
             routes.MapRoute(
                 "Normal apis",
-                "api/{*url}",
+                "{*url}",
                 new { controller = "MainApi", action = "NormalApiCall" }
                 );
             // for main pages
