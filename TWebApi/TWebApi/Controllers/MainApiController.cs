@@ -10,23 +10,28 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web.Mvc;
 using customApiApp_3.Responses;
+using log4net;
 
 namespace customApiApp_3.Controllers
 {
     public class MainApiController : Controller
     {
+        private static ILog Logger = log4net.LogManager.GetLogger(typeof (MainApiController));
         public string GetByIndex()
         {
+            Logger.Debug("in GetByIndex");
             return ProcessRequest(RequestType.GetById);
         }
 
         public string NormalApiCall()
         {
+            Logger.Debug("in NormalApiCall");
             return ProcessRequest(RequestType.NormalApiCall);
         }
 
         public string ProcessRequest(RequestType requestType)
         {
+            Logger.Debug("in ProcessRequest, requestType=" + requestType);
             var stopwatch = new Stopwatch();
             stopwatch.Start();
             Response.AddHeader("Content-Type", "application/json");
@@ -39,6 +44,8 @@ namespace customApiApp_3.Controllers
                     : ProcessGetByIndex(Request);
                 if (response is Response)
                 {
+                    Logger.Debug("uri=" + Request.Url + "  verb=" + Request.HttpMethod + "  postdata=" + Request.Form +
+                                 "  response=" + Utilis.JsonSerializer(response));
                     responseDictionary.Add("StatusCode", ((Response) response).StatusCode);
                     responseDictionary.Add("ErrorMessage", ((Response) response).CustomMessage);
                 }
@@ -78,6 +85,8 @@ namespace customApiApp_3.Controllers
             }
             catch (Exception exc)
             {
+                Logger.Error("uri=" + Request.Url + "   verb=" + Request.HttpMethod + "   postData=" +
+                             Utilis.JsonSerializer(Request.Form) + "  error:" + exc);
                 responseDictionary.Add("StatusCode", 500);
                 responseDictionary.Add("ErrorMessage", "Internal server error!");
                 responseDictionary.Add("WhatToDo", "Blame Denis for this...");
@@ -104,7 +113,7 @@ namespace customApiApp_3.Controllers
             var controllerType = Utilis.GetTypeByNameAndAncestor<ITApiController>(controllerName + "Controller");
             if (controllerType == null)
             {
-                controllerType = Utilis.GetTypeByNameAndAncestor<ITApiController>(controllerName + "Controller");
+                controllerType = Utilis.GetTypeByNameAndAncestor<ITApiController>(controllerName);
                 if (controllerType == null)
                     return new NotFound("No controller with name '" + controllerName + "' or '" + controllerName + "Controller' found!");
             }
@@ -169,7 +178,7 @@ namespace customApiApp_3.Controllers
             var controllerType = Utilis.GetTypeByNameAndAncestor<ITApiController>(controllerName + "Controller");
             if (controllerType == null)
             {
-                controllerType = Utilis.GetTypeByNameAndAncestor<ITApiController>(controllerName + "Controller");
+                controllerType = Utilis.GetTypeByNameAndAncestor<ITApiController>(controllerName);
                 if (controllerType == null)
                     return new NotFound("No controller with name '"+ controllerName+"' or '" + controllerName + "Controller' found!");
             }

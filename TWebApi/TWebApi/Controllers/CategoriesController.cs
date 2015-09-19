@@ -9,6 +9,7 @@ using customApiApp_3.Responses;
 
 namespace customApiApp_3.Controllers
 {
+    [TypeAliases("Category")]
     public class CategoriesController : ITApiObjectController<Category>
     {
         private readonly DbSet<Category> _categories;
@@ -39,7 +40,7 @@ namespace customApiApp_3.Controllers
         public object New(Category shit)
         {
             _categories.Add(shit);
-            _tDbContext.SaveChangesAsync();
+            _tDbContext.SaveChanges();
             return new { Status = "new Category added", shit };
         }
         [AllowGet]
